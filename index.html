@@ -443,14 +443,12 @@
     <div id="optionsRow"></div>
 
     <div id="dragArea">
-      <div id="dragCard" class="card drag-card">
-        <div class="card-title" id="dragTitle">NESNE</div>
-        <div class="card-image">
-          <img id="dragImage" src="" alt="Nesne" />
-        </div>
-        <div class="card-subtitle" id="dragSubtitle">Object</div>
-      </div>
+  <div id="dragCard" class="card drag-card">
+    <div class="card-image">
+      <img id="dragImage" src="" alt="drag" />
     </div>
+  </div>
+</div>
 
     <div id="symbolsWrapper">
       <div id="symbolBar"></div>
@@ -814,58 +812,60 @@ function enableCountingMode() {
     }
 
     function setupNewRound() {
-      correctCountForItem = 0;
-      currentTarget = randomItem();
-      dragTitle.textContent = currentTarget.tr;
-      dragSubtitle.textContent = currentTarget.en;
-      dragImage.src = `assets/${currentTarget.id}.png`;
-      dragImage.alt = currentTarget.tr;
-      setupOptions();
-      resetDragPosition(true);
-    }
+  correctCountForItem = 0;
+  currentTarget = randomItem();
+
+  dragImage.src = `assets/${currentTarget.id}.png`;
+  dragImage.alt = currentTarget.id;
+
+  setupOptions();
+  resetDragPosition(true);
+}
 
     function setupOptions() {
 
-  // 🔥 Drag kartının kendisini seçeneklerden çıkarıyoruz (isteğe bağlı)
-  const pool = items.filter(i => i.id !== currentTarget.id);
-
-  // 🔥 Diğer seçenekleri rastgele seç
-  const others = shuffle(pool).slice(0, Math.max(currentChoices - 1, 0));
-
-  // 🔥 Doğru eşleme her zaman currentTarget.pair
+  // 🔥 Doğru eşleşme her zaman currentTarget.pair
   const correctOption = items.find(i => i.id === currentTarget.pair);
 
-  // 🔥 Doğru + yanlışlar
+  // Eğer pair bulunamazsa (hatalı item vs), hiç hata vermesin
+  if (!correctOption) {
+    console.error("PAIR EŞLEŞMESİ BULUNAMADI:", currentTarget);
+    return;
+  }
+
+  // 🔥 Havuz → sadece drag kartının kendisini çıkartıyoruz
+  const pool = items.filter(i => i.id !== currentTarget.id);
+
+  // 🔥 Havuzdan yanlış seçenekleri seç
+  const others = shuffle(pool.filter(i => i.id !== correctOption.id))
+                    .slice(0, Math.max(currentChoices - 1, 0));
+
+  // 🔥 Seçenekler → doğru eşleşme + yanlışlar
   currentOptions = shuffle([correctOption, ...others]).slice(0, currentChoices);
 
-  // Eski render kodu:
+  // 🔥 Kartları çiz
   optionsRow.innerHTML = "";
-  currentOptions.forEach(item => {
-    const card = document.createElement("div");
-    card.className = "card option-card";
-    card.dataset.id = item.id;
+currentOptions.forEach(item => {
 
-    const t = document.createElement("div");
-    t.className = "card-title";
-    t.textContent = item.tr;
+  const card = document.createElement("div");
+  card.className = "card option-card";
+  card.dataset.id = item.id;
 
-    const imgDiv = document.createElement("div");
-    imgDiv.className = "card-image";
-    const img = document.createElement("img");
-    img.src = `assets/${item.id}.png`;
-    img.alt = item.tr;
-    imgDiv.appendChild(img);
+  // 🔥 SADECE RESİM (yazılar yok)
+  const imgDiv = document.createElement("div");
+  imgDiv.className = "card-image";
 
-    const sub = document.createElement("div");
-    sub.className = "card-subtitle";
-    sub.textContent = item.en;
+  const img = document.createElement("img");
+  img.src = `assets/${item.id}.png`;
+  img.alt = item.id;
 
-    card.appendChild(t);
-    card.appendChild(imgDiv);
-    card.appendChild(sub);
-    optionsRow.appendChild(card);
-  });
-}
+  imgDiv.appendChild(img);
+
+  // kartın içine sadece resim ekliyoruz
+  card.appendChild(imgDiv);
+
+  optionsRow.appendChild(card);
+});
 
     // DRAG & DROP (stabil)
     let dragging = false;
@@ -919,37 +919,41 @@ function enableCountingMode() {
     }
 
     function handleDrop() {
-      const dragRect = dragCard.getBoundingClientRect();
-      const optionCards = Array.from(document.querySelectorAll(".option-card"));
-      let hitCard = null;
-      let hitItem = null;
+  const dragRect = dragCard.getBoundingClientRect();
+  const optionCards = Array.from(document.querySelectorAll(".option-card"));
+  let hitCard = null;
+  let hitItem = null;
 
-      for (let i = 0; i < optionCards.length; i++) {
-        const card = optionCards[i];
-        const rect = card.getBoundingClientRect();
-        const overlap =
-          dragRect.right > rect.left &&
-          dragRect.left < rect.right &&
-          dragRect.bottom > rect.top &&
-          dragRect.top < rect.bottom;
-        if (overlap) {
-          hitCard = card;
-          hitItem = currentOptions[i];
-          break;
-        }
-      }
+  // 🔥 Hangi karta çarptığını bul
+  for (let i = 0; i < optionCards.length; i++) {
+    const card = optionCards[i];
+    const rect = card.getBoundingClientRect();
+    const overlap =
+      dragRect.right > rect.left &&
+      dragRect.left < rect.right &&
+      dragRect.bottom > rect.top &&
+      dragRect.top < rect.bottom;
 
-      if (!hitCard || !hitItem) {
-        showWrongFeedback();
-        return;
-      }
-
-      if (hitItem.id === currentTarget.id) {
-        showCorrectFeedback(hitCard);
-      } else {
-        showWrongFeedback();
-      }
+    if (overlap) {
+      hitCard = card;
+      hitItem = currentOptions[i];
+      break;
     }
+  }
+
+  // 💥 Hiçbir karta değmediyse
+  if (!hitCard || !hitItem) {
+    showWrongFeedback();
+    return;
+  }
+
+  // 🔥🔥🔥 PİKAM – YENİ P A İ R  K O N T R O L Ü 🔥🔥🔥
+  if (hitItem.id === currentTarget.pair) {
+    showCorrectFeedback(hitCard);
+  } else {
+    showWrongFeedback();
+  }
+}
 
     function showWrongFeedback() {
       dragCard.classList.add("wrong");
